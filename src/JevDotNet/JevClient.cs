@@ -67,18 +67,34 @@ public partial class JevClient
     };
 
     /// <summary>
-    /// Evaluates an input and converts the answers into a new result object.
+    /// Evaluates a state and converts the answers into a new result object.
     /// </summary>
     /// <typeparam name="T">The result type to create. It must have a parameterless constructor.</typeparam>
-    /// <param name="input">The text to evaluate.</param>
+    /// <param name="state">The state to evaluate. A plain string for text, or structured data such as an object or array.</param>
     /// <param name="cancellationToken">Cancellation Token</param>
     /// <returns>The converted result together with its token usage.</returns>
     public async Task<JevResponse<T>> EvaluateAsync<T>(
-        string input,
+        object state,
         CancellationToken cancellationToken = default)
     {
+        ArgumentNullException.ThrowIfNull(state);
+
         IReadOnlyList<QuestionDefinition> definitions = BuildQuestionDefinitions<T>();
-        JevRequest payload = new(_options.Model, input, BuildQuestions(definitions));
+        JevResponse rawResponse = await SendAsync(state, BuildQuestions(definitions), cancellationToken);
+        T result = ConvertAnswers<T>(definitions, rawResponse);
+
+        return new JevResponse<T>(
+            result,
+            rawResponse.Usage.InputTokenCount,
+            rawResponse.Usage.OutputTokenCount);
+    }
+
+    private async Task<JevResponse> SendAsync(
+        object state,
+        Dictionary<string, object> questions,
+        CancellationToken cancellationToken)
+    {
+        JevRequest payload = new(_options.Model, state, questions);
         string requestJson = JsonSerializer.Serialize(payload, JsonOptions);
 
         using HttpRequestMessage request = new(HttpMethod.Post, _options.Endpoint);
@@ -119,12 +135,8 @@ public partial class JevClient
                 $"The Jev API response is missing answers or usage. Check the endpoint and response " +
                 $"shape. See {WikiLinks.Troubleshooting}.");
         }
-        T result = ConvertAnswers<T>(definitions, rawResponse);
 
-        return new JevResponse<T>(
-            result,
-            rawResponse.Usage.InputTokenCount,
-            rawResponse.Usage.OutputTokenCount);
+        return rawResponse;
     }
 
     internal static HttpClient GetSharedHttpClient() => SharedHttpClient;
