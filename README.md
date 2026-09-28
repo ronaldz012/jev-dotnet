@@ -123,6 +123,51 @@ Boolean properties default to `true` at 0.5 or above. Configure the inclusive th
 public bool? IsBroken { get; set; }
 ```
 
+## Structured state
+
+`EvaluateAsync<T>` accepts plain text or structured data (an object or an array) as the state,
+so questions can point at specific parts of the state:
+
+```csharp
+var state = new
+{
+    context = "Decide which services to restart after the outage.",
+    services = new[]
+    {
+        new { name = "Billing", errors = 12 },
+        new { name = "Search", errors = 3 }
+    }
+};
+
+JevResponse<MyJevReturnObject> response = await client.EvaluateAsync<MyJevReturnObject>(state);
+```
+
+## Multiple dynamic Noul questions
+
+When the number of questions depends on your data, build them at runtime with
+`JevNoulQuestion` and evaluate them all in one request with `EvaluateNoulsAsync`.
+Answers come back keyed by the ID you chose, in question order:
+
+```csharp
+List<JevNoulQuestion> questions = [];
+for (int i = 0; i < services.Count; i++)
+{
+    questions.Add(new($"s{i}", $"Should `services[{i}]` be restarted as a whole?"));
+    for (int c = 0; c < services[i].Components.Count; c++)
+    {
+        questions.Add(new($"s{i}_c{c}", $"Should the component `services[{i}].components[{c}]` be restarted separately?"));
+    }
+}
+
+JevResponse<IReadOnlyDictionary<string, JevNoul>> response =
+    await client.EvaluateNoulsAsync(state, questions);
+
+bool restart = response.Result["s0"].IsAtLeast(0.7);
+```
+
+IDs must be unique (case-insensitive); a missing answer for a requested ID throws with
+the requested and received IDs listed.
+
 ## Custom client configuration
 
 For custom configuration, construct the client with `JevClientOptions`:

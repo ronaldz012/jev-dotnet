@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+- Added `JevNoulQuestion` and `JevClient.EvaluateNoulsAsync`, which evaluate a runtime-built list of Noul questions with caller-chosen IDs in a single request and return one `JevNoul` probability per ID.
+- Added an `EvaluateAsync<T>` overload that accepts a structured state (object or array) instead of plain text, for both attribute-based and dynamic questions.
+- Simplified `EvaluateAsync<T>` to a single method taking the state as an object; plain strings keep working and produce the same request. This removes the former string-only overload.
 
 ---
 
